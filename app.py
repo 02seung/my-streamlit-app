@@ -1,17 +1,23 @@
 
+
 import os
 import streamlit as st
 from openai import OpenAI
 
+# 페이지 설정
+st.set_page_config(
+    page_title="한영 번역기",
+    page_icon="🌐"
+)
+
 # OpenAI 클라이언트 생성
 client = OpenAI()
 
-# 페이지 설정
-st.set_page_config(page_title="   한영 번역기  ", page_icon=" 번역기 ")
-st.title("  번역기   ")
-st.write("  글자를 입력해주세요   ")
+# 제목 및 설명
+st.title("🌐 한영 번역기")
+st.write("번역할 한글 문장을 입력해주세요.")
 
-# 사용자 입력(텍스트)
+# 사용자 입력
 korean_text = st.text_area(
     "번역할 한글 문장을 입력하세요.",
     height=150,
@@ -19,21 +25,26 @@ korean_text = st.text_area(
 )
 
 # 번역 버튼
-if st.button("   번역하기  "):
+if st.button("번역하기"):
 
     if not korean_text.strip():
-        st.warning("  한글을 입력해주세요   ")
+        st.warning("한글을 입력해주세요.")
+
     else:
         with st.spinner("번역 중입니다..."):
 
             # 시스템 역할
             sys_role = """
-            당신은 유명한 통역가 입니다. 
+            당신은 전문 한국어-영어 번역가입니다.
+            한국어 문장을 자연스럽고 정확한 영어로 번역하세요.
+            원문의 의미와 문맥을 유지하세요.
+            추가 설명 없이 번역 결과만 출력하세요.
             """
 
             # 프롬프트 구성
             prompt = f"""
             다음 문장을 영어로 번역하세요.
+
             TEXT:
             {korean_text}
             """
@@ -42,13 +53,14 @@ if st.button("   번역하기  "):
             response = client.responses.create(
                 model="gpt-4o-mini",
                 input=[
-                    {"role": "system", "content": sys_role   },
-                    {"role": "user", "content": prompt  }
+                    {"role": "system", "content": sys_role},
+                    {"role": "user", "content": prompt}
                 ]
             )
 
-            # 결과 출력
-            translated_text = "번역"
+            # GPT 응답 가져오기
+            translated_text = response.output_text
 
-            st.subheader("   번역 완료  ")
-            st.success(     )
+            # 번역 결과 출력
+            st.subheader("✅ 번역 완료")
+            st.success(translated_text)
