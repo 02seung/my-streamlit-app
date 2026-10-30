@@ -28,8 +28,7 @@ if st.button("     "):
 
             # 시스템 역할
             sys_role = """
-
-
+            당신은 유명한 통역가 입니다. 
             """
 
             # 프롬프트 구성
@@ -43,8 +42,8 @@ if st.button("     "):
             response = client.responses.create(
                 model="gpt-4o-mini",
                 input=[
-                    {"role": "system", "content":    },
-                    {"role": "user", "content":    }
+                    {"role": "system", "content": sys_role   },
+                    {"role": "user", "content": prompt  }
                 ]
             )
 
