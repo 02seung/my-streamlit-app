@@ -7,9 +7,9 @@ from openai import OpenAI
 client = OpenAI()
 
 # 페이지 설정
-st.set_page_config(page_title="     ", page_icon="  ")
-st.title("     ")
-st.write("     ")
+st.set_page_config(page_title="   한영 번역기  ", page_icon=" 번역기 ")
+st.title("  번역기   ")
+st.write("  글자를 입력해주세요   ")
 
 # 사용자 입력(텍스트)
 korean_text = st.text_area(
@@ -19,10 +19,10 @@ korean_text = st.text_area(
 )
 
 # 번역 버튼
-if st.button("     "):
+if st.button("   번역하기  "):
 
     if not korean_text.strip():
-        st.warning("     ")
+        st.warning("  한글을 입력해주세요   ")
     else:
         with st.spinner("번역 중입니다..."):
 
@@ -48,7 +48,7 @@ if st.button("     "):
             )
 
             # 결과 출력
-            translated_text =
+            translated_text = "번역"
 
-            st.subheader("     ")
+            st.subheader("   번역 완료  ")
             st.success(     )
