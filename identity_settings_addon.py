@@ -1,14 +1,3 @@
-"""Thumbs Up AI 인물 식별 및 설정 모듈"""
-
-import copy
-import json
-import re
-
-from collections import defaultdict
-
-import streamlit as st
-#준서님 코드
-%%writefile identity_settings_addon.py
 """ThumpsUp AI에 인물 호칭 정규화 + 문맥 식별 + 설정창을 추가하는 독립 모듈.
 기존 app.py의 process_audio() 함수나 UI 코드를 직접 정의/덮어쓰지 않는다.
 """
@@ -336,5 +325,3 @@ def render_identity_settings():
 def show_identity_settings_dialog():
     """현재 화면의 오른쪽 위 설정 버튼용 팝업."""
     render_identity_settings()
-
-
