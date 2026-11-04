@@ -1,353 +1,467 @@
 
 import os
 import io
+import html
+import hashlib
+
 import streamlit as st
 from openai import OpenAI
 from streamlit_mic_recorder import mic_recorder
 
-# -----------------------------------
-# 페이지 설정
-# -----------------------------------
+
+# ==========================================
+# 1. 페이지 설정
+# ==========================================
 st.set_page_config(
     page_title="ThumpsUp AI",
     page_icon="👍🏻",
     layout="wide"
 )
 
-# -----------------------------------
-# OpenAI 클라이언트
-# -----------------------------------
-client = None
-if os.getenv("OPENAI_API_KEY"):
-    client = OpenAI()
 
-# -----------------------------------
-# 세션 상태
-# -----------------------------------
-if "transcript" not in st.session_state:
-    st.session_state.transcript = ""
-
-if "answer" not in st.session_state:
-    st.session_state.answer = ""
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-if "uploaded_text" not in st.session_state:
-    st.session_state.uploaded_text = ""
-
-# -----------------------------------
-# CSS
-# -----------------------------------
+# ==========================================
+# 2. CSS 디자인
+# ==========================================
 st.markdown("""
 <style>
 .block-container {
-    max-width: 1200px;
-    padding-top: 1.2rem;
-    padding-bottom: 2rem;
+    max-width: 1000px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
 }
 
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-
-.main-wrap {
-    background: #f7f7f8;
-    border-radius: 28px;
-    padding: 24px 28px 40px 28px;
+header[data-testid="stHeader"] {
+    background: transparent;
 }
 
-.top-brand {
+.voice-title {
     text-align: center;
-    margin-bottom: 18px;
+    font-size: 32px;
+    font-weight: 750;
+    margin-top: 35px;
 }
 
-.brand-title {
-    font-size: 30px;
-    font-weight: 800;
-    color: #222;
-}
-
-.brand-sub {
-    font-size: 14px;
-    color: #777;
-    margin-top: 4px;
-}
-
-.center-card {
-    background: white;
-    border-radius: 26px;
-    min-height: 220px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.voice-subtitle {
     text-align: center;
-    padding: 30px 40px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-    font-size: 30px;
-    font-weight: 600;
-    line-height: 1.5;
-    color: #222;
-    margin-top: 20px;
-    margin-bottom: 34px;
-}
-
-.wave-wrap {
-    text-align: center;
-    margin-top: 10px;
+    color: #888;
     margin-bottom: 24px;
 }
 
-.fake-mic {
-    width: 130px;
-    height: 130px;
-    margin: 0 auto 18px auto;
-    border-radius: 50%;
-    background: radial-gradient(circle, #f8fbff 0%, #edf2ff 80%);
-    border: 1px solid #dfe5ff;
-    box-shadow: 0 10px 30px rgba(145, 165, 255, 0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 52px;
+.mic-caption {
+    text-align: center;
+    color: #858b97;
+    margin: 10px 0 26px;
 }
 
-.wave-line {
-    width: 75%;
-    height: 12px;
-    margin: 0 auto;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #cfdcff, #f1c3cf, #d6cfff);
-    opacity: 0.95;
-}
-
-.section-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: #333;
-}
-
-.info-box {
-    background: white;
-    padding: 18px;
+.answer-box {
+    background: #f7f8fc;
+    border: 1px solid #e9ecf3;
     border-radius: 18px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.03);
-    margin-bottom: 14px;
+    padding: 20px 24px;
+    line-height: 1.75;
+    color: #303744;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.small-text {
-    color: #666;
-    font-size: 14px;
-    line-height: 1.7;
-}
-
-.status-chip {
-    display: inline-block;
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: #eef4ff;
-    color: #446;
-    font-size: 13px;
-    margin-top: 8px;
-}
-
-div[data-testid="stFileUploader"] {
-    background: white;
-    border-radius: 16px;
-    padding: 10px;
-}
-
-div[data-testid="stAudio"] {
-    margin-top: 10px;
-}
-
-.history-box {
-    background: white;
-    border-radius: 18px;
-    padding: 18px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.03);
+.answer-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------------
-# 시스템 프롬프트
-# -----------------------------------
+
+# ==========================================
+# 3. 세션 상태 초기화
+# ==========================================
+defaults = {
+    "answer": "",
+    "transcript": "",
+    "answer_audio": None,
+    "answer_expanded": False,
+    "history": [],
+    "last_processed_audio": None,
+}
+
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
+
+
+# ==========================================
+# 4. OpenAI 클라이언트
+# ==========================================
+def get_client():
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
+        try:
+            api_key = st.secrets.get("OPENAI_API_KEY")
+        except Exception:
+            api_key = None
+
+    if not api_key:
+        return None
+
+    return OpenAI(api_key=api_key)
+
+
+# ==========================================
+# 5. AI 시스템 역할
+# ==========================================
 SYSTEM_PROMPT = """
-당신은 ThumpsUp AI라는 음성 기반 개인 비서입니다.
+당신은 ThumpsUp AI라는 한국어 음성 비서입니다.
 
 역할:
-- 사용자의 음성 명령을 이해하고 친절하게 답합니다.
-- 일정 관리, 웹 검색, 주식 조회, 파일 요약 요청을 구분합니다.
-- 한국어로 간결하고 이해하기 쉽게 답합니다.
-- 아직 실제 기능이 연결되지 않은 경우에는 거짓으로 실행했다고 말하지 말고,
-  현재 가능한 안내를 제공합니다.
+1. 사용자의 음성 명령을 이해합니다.
+2. 질문에 친절하고 정확하게 답변합니다.
+3. 음성으로 듣기 편하도록 간결하게 설명합니다.
+4. 첨부된 텍스트 파일을 참고할 수 있습니다.
+5. 확실하지 않은 정보는 추측하지 않습니다.
+
+주의:
+웹 검색, 실시간 주식 조회, Google Calendar 등록 및
+조회 기능은 아직 연결되지 않았습니다.
+
+실제로 실행하지 않은 작업을 완료했다고 말하지 마세요.
 """
 
-# -----------------------------------
-# 함수
-# -----------------------------------
-def speech_to_text(audio_bytes):
-    audio_file = io.BytesIO(audio_bytes)
-    audio_file.name = "recording.wav"
 
-    transcript = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=audio_file
-    )
-    return transcript.text
+# ==========================================
+# 6. 음성 처리 함수
+# ==========================================
+def process_audio(audio_bytes, reference_text):
 
-def ask_ai(user_text, extra_text=""):
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    client = get_client()
 
-    if extra_text:
-        messages.append({
-            "role": "system",
-            "content": f"다음 참고 파일 내용도 함께 고려하세요:\n{extra_text[:15000]}"
-        })
-
-    for item in st.session_state.history[-6:]:
-        messages.append(item)
-
-    messages.append({"role": "user", "content": user_text})
-
-    response = client.responses.create(
-        model="gpt-4o-mini",
-        input=messages
-    )
-
-    return response.output_text
-
-def process_audio(audio_bytes):
     if client is None:
         st.error("OPENAI_API_KEY가 설정되지 않았습니다.")
         return
 
-    with st.spinner("음성을 인식하고 있습니다..."):
-        transcript = speech_to_text(audio_bytes)
-        st.session_state.transcript = transcript
+    try:
+        # ----------------------------------
+        # STT: 음성 -> 텍스트
+        # ----------------------------------
+        with st.spinner("음성을 인식하고 있습니다..."):
 
-    with st.spinner("ThumpsUp AI가 답변을 생성하고 있습니다..."):
-        answer = ask_ai(transcript, st.session_state.uploaded_text)
-        st.session_state.answer = answer
+            audio_file = io.BytesIO(audio_bytes)
+            audio_file.name = "recording.wav"
 
-    st.session_state.history.append({"role": "user", "content": transcript})
-    st.session_state.history.append({"role": "assistant", "content": answer})
+            result = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
 
-# -----------------------------------
-# 상단
-# -----------------------------------
-st.markdown('<div class="main-wrap">', unsafe_allow_html=True)
+            question = result.text.strip()
 
-st.markdown("""
-<div class="top-brand">
-    <div class="brand-title">👍🏻 ThumpsUp AI</div>
-    <div class="brand-sub">Voice First Personal Assistant</div>
-</div>
-""", unsafe_allow_html=True)
+        if not question:
+            st.warning("음성이 인식되지 않았습니다.")
+            return
 
-display_text = "무엇을 도와드릴까요?"
-if st.session_state.answer:
-    display_text = st.session_state.answer
-elif st.session_state.transcript:
-    display_text = st.session_state.transcript
+        # ----------------------------------
+        # AI 대화 메시지 구성
+        # ----------------------------------
+        conversation = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+            }
+        ]
 
-st.markdown(
-    f'<div class="center-card">{display_text}</div>',
-    unsafe_allow_html=True
-)
+        if reference_text:
+            conversation.append({
+                "role": "system",
+                "content": (
+                    "참고 파일 내용:\n"
+                    + reference_text[:15000]
+                )
+            })
 
-st.markdown("""
-<div class="wave-wrap">
-    <div class="fake-mic">🎙️</div>
-    <div class="wave-line"></div>
-</div>
-""", unsafe_allow_html=True)
-
-# -----------------------------------
-# 실제 음성 입력 영역
-# -----------------------------------
-st.markdown("### 음성 입력")
-st.caption("아래 마이크 버튼을 눌러 녹음한 뒤, 완료하면 자동으로 인식합니다.")
-
-audio = mic_recorder(
-    start_prompt="🎙️ 마이크 버튼을 눌러 녹음 시작",
-    stop_prompt="⏹️ 녹음 종료",
-    just_once=True,
-    use_container_width=True,
-    key="voice_recorder"
-)
-
-if audio:
-    audio_bytes = audio["bytes"]
-    st.audio(audio_bytes, format="audio/wav")
-    process_audio(audio_bytes)
-
-st.divider()
-
-# -----------------------------------
-# 하단 영역
-# -----------------------------------
-left, right = st.columns([1.2, 1])
-
-with left:
-    st.markdown('<div class="info-box">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">참고 파일 업로드</div>', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("TXT 파일 업로드", type=["txt"], label_visibility="collapsed")
-
-    if uploaded_file is not None:
-        st.session_state.uploaded_text = uploaded_file.read().decode("utf-8", errors="replace")
-        st.markdown(
-            f'<div class="status-chip">업로드 완료: {uploaded_file.name}</div>',
-            unsafe_allow_html=True
+        # 이전 대화 유지
+        conversation.extend(
+            st.session_state.history[-8:]
         )
 
+        conversation.append({
+            "role": "user",
+            "content": question
+        })
+
+        # ----------------------------------
+        # LLM 답변 생성
+        # ----------------------------------
+        with st.spinner("ThumpsUp AI가 답변 중입니다..."):
+
+            response = client.responses.create(
+                model="gpt-4o-mini",
+                input=conversation
+            )
+
+            answer = response.output_text.strip()
+
+        # ----------------------------------
+        # TTS: 텍스트 -> 음성
+        # ----------------------------------
+        answer_audio = None
+
+        try:
+            with st.spinner("음성 답변을 생성하고 있습니다..."):
+
+                speech = client.audio.speech.create(
+                    model="tts-1",
+                    voice="nova",
+                    input=answer[:4000]
+                )
+
+                answer_audio = speech.read()
+
+        except Exception as e:
+            st.warning(f"음성 합성 오류: {e}")
+
+        # ----------------------------------
+        # 결과 저장
+        # ----------------------------------
+        st.session_state.transcript = question
+        st.session_state.answer = answer
+        st.session_state.answer_audio = answer_audio
+        st.session_state.answer_expanded = False
+
+        st.session_state.history.extend([
+            {
+                "role": "user",
+                "content": question
+            },
+            {
+                "role": "assistant",
+                "content": answer
+            }
+        ])
+
+    except Exception as e:
+        st.error(f"AI 처리 중 오류: {e}")
+
+
+# ==========================================
+# 7. 상단 헤더 + 설정 버튼
+# ==========================================
+brand_col, settings_col = st.columns(
+    [12, 1],
+    vertical_alignment="center"
+)
+
+with brand_col:
+    st.markdown("### 👍🏻 ThumpsUp AI")
+
+with settings_col:
+    if st.button(
+        "⚙️",
+        key="settings_button",
+        help="설정"
+    ):
+        st.toast("설정 기능은 추후 추가할 예정입니다.")
+
+
+# ==========================================
+# 8. 중앙 안내 문구
+# ==========================================
+st.markdown("""
+<div class="voice-title">
+    무엇을 도와드릴까요?
+</div>
+
+<div class="voice-subtitle">
+    음성으로 말씀하시면 ThumpsUp AI가 답변합니다.
+</div>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
+# 9. TXT 파일 업로드
+# ==========================================
+with st.expander("📎 참고 TXT 파일 첨부 (선택)"):
+
+    uploaded_file = st.file_uploader(
+        "텍스트 파일",
+        type=["txt"],
+        key="txt_file"
+    )
+
+    if uploaded_file is not None:
+        st.success(
+            f"{uploaded_file.name} 파일이 준비되었습니다."
+        )
+
+reference_text = ""
+
+if uploaded_file is not None:
+    reference_text = uploaded_file.getvalue().decode(
+        "utf-8-sig",
+        errors="replace"
+    )
+
+
+# ==========================================
+# 10. 중앙 음성 녹음 버튼
+# ==========================================
+left, mic_col, right = st.columns([3, 2, 3])
+
+with mic_col:
+
+    audio = mic_recorder(
+        start_prompt="🎙️ 녹음 시작",
+        stop_prompt="⏹️ 녹음 종료",
+        just_once=False,
+        use_container_width=True,
+        key="voice_recorder"
+    )
+
+st.markdown("""
+<div class="mic-caption">
+    마이크를 눌러 녹음을 시작하고,
+    다시 눌러 종료하세요.
+</div>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
+# 11. 음성 녹음 자동 처리
+# ==========================================
+if audio and audio.get("bytes"):
+
+    audio_bytes = audio["bytes"]
+
+    # 동일한 녹음을 반복 처리하지 않도록 방지
+    audio_hash = hashlib.sha256(
+        audio_bytes
+    ).hexdigest()
+
+    if audio_hash != st.session_state.last_processed_audio:
+
+        st.session_state.last_processed_audio = audio_hash
+
+        process_audio(
+            audio_bytes,
+            reference_text
+        )
+
+
+# ==========================================
+# 12. AI 답변 표시
+# ==========================================
+st.subheader("👍🏻 AI 답변")
+
+answer = st.session_state.answer
+
+if answer:
+
+    # HTML 특수문자 변환
+    safe_answer = html.escape(answer)
+
+    # 펼침 상태
+    if st.session_state.answer_expanded:
+        collapsed_class = ""
+    else:
+        collapsed_class = "answer-collapsed"
+
+    # 답변 출력
     st.markdown(
-        '<div class="small-text">파일을 업로드한 뒤 음성으로 "이 파일 요약해줘"처럼 말하면 됩니다.</div>',
+        f"""
+        <div class="answer-box">
+            <div class="{collapsed_class}">
+                {safe_answer}
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True
     )
-    st.markdown('</div>', unsafe_allow_html=True)
 
-with right:
-    st.markdown('<div class="info-box">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">예시 음성 명령</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="small-text">
-    - 오늘 일정 알려줘<br>
-    - 내일 오후 3시에 회의 등록해줘<br>
-    - 삼성전자 주가 알려줘<br>
-    - 오늘 AI 뉴스 검색해줘<br>
-    - 이 파일 요약해줘
-    </div>
-    """, unsafe_allow_html=True)
+    # 긴 답변에만 더보기 표시
+    # 글자 수 기반의 근사 판정
+    is_long = (
+        len(answer) > 85
+        or answer.count("\n") >= 2
+    )
 
-    if client:
-        st.markdown('<div class="status-chip">OpenAI 연결 준비 완료</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="status-chip">OpenAI API 키 필요</div>', unsafe_allow_html=True)
+    if is_long:
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        if st.session_state.answer_expanded:
+            button_text = "접기 ▲"
+        else:
+            button_text = "더보기 ▼"
 
-# -----------------------------------
-# 최근 대화
-# -----------------------------------
-st.markdown("### 최근 대화")
+        if st.button(
+            button_text,
+            key="toggle_answer"
+        ):
 
-if not st.session_state.history:
-    st.info("아직 대화 기록이 없습니다.")
+            st.session_state.answer_expanded = (
+                not st.session_state.answer_expanded
+            )
+
+            st.rerun()
+
+    # AI 음성 답변 재생
+    if st.session_state.answer_audio:
+
+        st.audio(
+            st.session_state.answer_audio,
+            format="audio/mp3"
+        )
+
 else:
-    st.markdown('<div class="history-box">', unsafe_allow_html=True)
-    for msg in st.session_state.history[-8:]:
-        role = "사용자" if msg["role"] == "user" else "ThumpsUp AI"
-        st.markdown(f"**{role}**")
-        st.write(msg["content"])
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.info(
+        "음성으로 질문하면 AI 답변이 여기에 표시됩니다."
+    )
 
-    if st.button("대화 초기화", use_container_width=True):
-        st.session_state.transcript = ""
-        st.session_state.answer = ""
-        st.session_state.history = []
-        st.rerun()
 
-st.markdown('</div>', unsafe_allow_html=True)
+# ==========================================
+# 13. 인식된 음성 확인
+# ==========================================
+if st.session_state.transcript:
+
+    with st.expander("인식된 음성 확인"):
+
+        st.write(
+            st.session_state.transcript
+        )
+
+
+# ==========================================
+# 14. 최근 대화 기록
+# ==========================================
+with st.expander("최근 대화 기록"):
+
+    if not st.session_state.history:
+
+        st.caption("아직 대화 기록이 없습니다.")
+
+    else:
+
+        for message in st.session_state.history[-10:]:
+
+            if message["role"] == "user":
+                who = "나"
+            else:
+                who = "ThumpsUp AI"
+
+            st.markdown(f"**{who}**")
+            st.write(message["content"])
+
+        if st.button("대화 초기화"):
+
+            reset_values = {
+                "answer": "",
+                "transcript": "",
+                "answer_audio": None,
+                "answer_expanded": False,
+                "history": [],
+                "last_processed_audio": None
+            }
+
+            for key, value in reset_values.items():
+                st.session_state[key] = value
+
+            st.rerun()
