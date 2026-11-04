@@ -85,54 +85,73 @@ for key, value in DEFAULTS.items():
 # 2. 인터페이스 디자인
 # ==========================================
 
-st.markdown("""
+
+# ==========================================
+# 2. 인터페이스 디자인 - 오류 수정본
+# ==========================================
+
+CSS = """
 <style>
 .block-container {
     max-width: 1150px;
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
+
+/* 질문 기록 사이드바 */
 [data-testid="stSidebar"] {
     background: #fff0d7;
     border-left: 3px solid #1595ff;
 }
+
 [data-testid="stSidebarCollapsedControl"] {
     display: none !important;
 }
+
 [data-testid="stSidebar"] .stButton button {
     width: 100%;
     justify-content: flex-start;
     text-align: left;
     background: transparent;
-    border: none;
+    border: 0;
     border-radius: 8px;
     color: #222;
     box-shadow: none;
+    transition: background-color 0.2s ease;
 }
+
 [data-testid="stSidebar"] .stButton button:hover {
     background: #ffd49b !important;
     color: #111 !important;
 }
+
 [data-testid="stSidebar"] .stButton button[kind="primary"] {
     background: #ffdfad !important;
 }
+
+/* 메인 인터페이스 */
 .st-key-assistant_card {
     background: white;
     border: 1px solid #e6e6e9 !important;
     border-radius: 26px !important;
     padding: 26px 32px 30px !important;
 }
+
+/* 상단 제목 */
 .brand {
     font-size: 25px;
     font-weight: 750;
     line-height: 1.35;
     color: #111;
 }
+
 .desc {
     font-size: 13px;
     color: #333;
     margin-top: 14px;
 }
+
+/* 상단 버튼 */
 .st-key-header_actions button {
     border: 0 !important;
     background: transparent !important;
@@ -140,6 +159,8 @@ st.markdown("""
     font-size: 23px !important;
     padding: 0 !important;
 }
+
+/* 사용자 질문 영역 */
 .question {
     width: min(100%, 365px);
     min-height: 182px;
@@ -148,15 +169,20 @@ st.markdown("""
     border: 1px solid #eee;
     box-shadow: 0 1px 7px #00000018;
     font-size: 19px;
+    line-height: 1.55;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     box-sizing: border-box;
 }
+
+/* 마이크 양옆 가로선 */
 .rule {
     height: 1px;
     background: #505050;
     width: 100%;
 }
+
+/* AI 처리 상태 */
 .status {
     width: min(100%, 365px);
     margin: 18px auto;
@@ -167,10 +193,13 @@ st.markdown("""
     color: #555;
     font-size: 12px;
 }
+
+/* AI 답변 영역 */
 .answer {
     width: min(100%, 365px);
     margin: 0 auto;
 }
+
 .answer-body {
     padding: 12px 15px;
     background: #f3f3f3;
@@ -180,6 +209,7 @@ st.markdown("""
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
 .answer-body.short {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -187,23 +217,29 @@ st.markdown("""
     overflow: hidden;
     white-space: normal;
 }
+
+/* 답변 더보기 */
 .st-key-answer_more button {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
 }
 </style>
-""" + (
-    """
+"""
+
+# CSS는 HTML 전용 렌더링으로 처리
+st.html(CSS)
+
+# 사이드바가 닫힌 경우에만 숨김 CSS 적용
+if not st.session_state.sidebar_open:
+    st.html("""
     <style>
     [data-testid="stSidebar"] {
         display: none !important;
     }
     </style>
-    """
-    if not st.session_state.sidebar_open
-    else ""
-), unsafe_allow_html=True)
+    """)
+
 
 
 # ==========================================
