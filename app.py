@@ -1,97 +1,204 @@
 
 import os
 import io
-from datetime import date, time, datetime
-
 import streamlit as st
 from openai import OpenAI
 
-# ==========================================
-# 1. 페이지 설정
-# ==========================================
+# -----------------------------------
+# 기본 설정
+# -----------------------------------
 st.set_page_config(
-    page_title="JARVIS | Personal AI Assistant",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="ThumpsUp AI",
+    page_icon="👍🏻",
+    layout="wide"
 )
 
+client = None
+if os.getenv("OPENAI_API_KEY"):
+    client = OpenAI()
+
+# -----------------------------------
+# 세션 상태
+# -----------------------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_transcript" not in st.session_state:
+    st.session_state.last_transcript = ""
+
+if "last_answer" not in st.session_state:
+    st.session_state.last_answer = ""
+
+if "mode" not in st.session_state:
+    st.session_state.mode = "Speak"
+
+# -----------------------------------
+# CSS
+# -----------------------------------
 st.markdown("""
 <style>
+html, body, [class*="css"] {
+    font-family: "Pretendard", "Noto Sans KR", sans-serif;
+}
+
 .block-container {
-    max-width: 1050px;
-    padding-top: 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
 }
-.hero {
+
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+.main-shell {
+    background: #f8f8f8;
+    border-radius: 28px;
+    padding: 28px 36px 36px 36px;
+    min-height: 80vh;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.05);
+}
+
+.brand {
+    font-size: 30px;
+    font-weight: 800;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.sub-brand {
+    color: #888;
+    font-size: 15px;
+    margin-bottom: 30px;
+}
+
+.mode-tabs {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.mode-chip-active {
+    font-size: 18px;
+    font-weight: 700;
+    color: #7c96ff;
+    border-bottom: 2px solid #7c96ff;
+    padding-bottom: 6px;
+}
+
+.mode-chip {
+    font-size: 18px;
+    font-weight: 600;
+    color: #444;
+    padding-bottom: 6px;
+}
+
+.center-guide {
     text-align: center;
-    padding: 30px 10px 20px;
+    color: #666;
+    font-size: 15px;
+    margin-bottom: 18px;
 }
-.hero-icon {
-    font-size: 65px;
-    margin-bottom: 12px;
+
+.command-card {
+    background: white;
+    border-radius: 24px;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+    font-size: 34px;
+    line-height: 1.5;
+    font-weight: 600;
+    color: #222;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
 }
-.hero-title {
-    font-size: 29px;
-    font-weight: 750;
+
+.wave-wrap {
+    text-align: center;
+    margin-top: 25px;
+    margin-bottom: 25px;
 }
-.hero-subtitle {
-    color: #9299a5;
-    margin-top: 8px;
+
+.mic-circle {
+    width: 88px;
+    height: 88px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, #eef3ff 70%);
+    border: 1px solid #d7e0ff;
+    box-shadow: 0 8px 25px rgba(124,150,255,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
 }
-.feature-box {
-    border: 1px solid rgba(140,150,160,0.25);
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 12px;
+
+.wave-line {
+    width: 70%;
+    margin: 16px auto 0 auto;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #d6dfff, #f5c6cf, #d6dfff);
+    opacity: 0.8;
+}
+
+.small-card {
+    background: white;
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+    margin-bottom: 14px;
+}
+
+.small-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.status-box {
+    background: #f3f6ff;
+    padding: 12px 14px;
+    border-radius: 12px;
+    color: #355;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.bottom-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.hint-list {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.8;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. 상태 관리
-# ==========================================
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "schedules" not in st.session_state:
-    st.session_state.schedules = []
-
-if "last_search" not in st.session_state:
-    st.session_state.last_search = ""
-
-if "last_stock" not in st.session_state:
-    st.session_state.last_stock = ""
-
-
-# ==========================================
-# 3. OpenAI 클라이언트
-# ==========================================
-def get_client():
-    api_key = os.environ.get("OPENAI_API_KEY")
-
-    if not api_key:
-        return None
-
-    return OpenAI(api_key=api_key)
-
-
-SYSTEM_ROLE = """
-당신은 JARVIS라는 개인 AI 음성 비서입니다.
+# -----------------------------------
+# AI 함수
+# -----------------------------------
+SYSTEM_PROMPT = """
+당신은 ThumpsUp AI라는 음성 기반 개인 비서입니다.
 
 역할:
-1. 사용자의 질문에 친절하게 답변합니다.
-2. 한국어로 자연스럽게 대답합니다.
-3. 음성으로 듣기 편하도록 간결하게 설명합니다.
-4. 확실하지 않은 내용은 추측하지 않습니다.
-5. 실시간 검색이나 캘린더에 접근할 수 없다면
-   실제로 조회하거나 등록했다고 주장하지 않습니다.
+- 사용자의 음성 명령을 이해하고 수행을 도와줍니다.
+- 일정 관리, 웹 검색, 주식 정보, 파일 요약 요청을 구분합니다.
+- 친절하고 간결하게 한국어로 답변합니다.
+- 아직 실제 기능이 연결되지 않은 경우, 가능한 동작을 안내합니다.
 """
 
-
-# ==========================================
-# 4. AI 기능
-# ==========================================
-def speech_to_text(client, audio_bytes):
+def speech_to_text(audio_bytes):
     audio_file = io.BytesIO(audio_bytes)
     audio_file.name = "recording.wav"
 
@@ -99,513 +206,204 @@ def speech_to_text(client, audio_bytes):
         model="whisper-1",
         file=audio_file
     )
-
     return transcript.text
 
+def ask_ai(user_text, extra_text=""):
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-def ask_ai(client, question, reference_text=""):
-    system_content = SYSTEM_ROLE
-
-    if reference_text:
-        system_content += (
-            "\n\n참고 문서 내용:\n"
-            + reference_text[:20000]
-        )
-
-    # 최근 대화 내용을 함께 전달
-    history = []
-
-    for msg in st.session_state.messages[-10:]:
-        history.append({
-            "role": msg["role"],
-            "content": msg["content"]
+    if extra_text:
+        messages.append({
+            "role": "system",
+            "content": f"참고 파일 내용:\n{extra_text[:15000]}"
         })
+
+    for m in st.session_state.messages[-6:]:
+        messages.append({"role": m["role"], "content": m["content"]})
+
+    messages.append({"role": "user", "content": user_text})
 
     response = client.responses.create(
         model="gpt-4o-mini",
-        input=[
-            {"role": "system", "content": system_content},
-            *history,
-            {"role": "user", "content": question}
-        ]
+        input=messages
     )
-
     return response.output_text
 
+# -----------------------------------
+# UI 시작
+# -----------------------------------
+st.markdown('<div class="main-shell">', unsafe_allow_html=True)
 
-def text_to_speech(client, answer, voice):
-    speech_response = client.audio.speech.create(
-        model="tts-1",
-        voice=voice,
-        input=answer
-    )
+top_left, top_right = st.columns([5, 1])
 
-    return speech_response.read()
+with top_left:
+    st.markdown('<div class="brand">👍🏻 ThumpsUp AI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-brand">Voice First Personal Assistant</div>', unsafe_allow_html=True)
 
-
-def process_question(question, reference_text=""):
-    if not question.strip():
-        st.warning("질문을 입력하거나 녹음해주세요.")
-        return
-
-    client = get_client()
-
-    if client is None:
-        st.error("OPENAI_API_KEY가 설정되지 않았습니다.")
-        return
-
-    try:
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
-            answer = ask_ai(client, question, reference_text)
-
-            audio_data = None
-
-            if st.session_state.voice_enabled:
-                audio_data = text_to_speech(
-                    client,
-                    answer,
-                    st.session_state.voice
-                )
-
-        st.session_state.messages.append({
-            "role": "user",
-            "content": question
-        })
-
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer,
-            "audio": audio_data
-        })
-
-    except Exception as e:
-        st.error(f"AI 처리 중 오류: {e}")
-
-
-# ==========================================
-# 5. 사이드바
-# ==========================================
-with st.sidebar:
-    st.title("🤖 JARVIS AI")
-    st.caption("Personal AI Voice Assistant")
-    st.divider()
-
-    menu = st.radio(
-        "메뉴",
-        [
-            "🎙️ 음성 비서",
-            "📅 일정 관리",
-            "🔎 AI 검색",
-            "📈 주식 분석",
-            "⚙️ 설정"
-        ]
-    )
-
-    st.divider()
-
-    st.session_state.voice_enabled = st.toggle(
-        "AI 음성 답변",
-        value=st.session_state.get("voice_enabled", True)
-    )
-
-    st.session_state.show_text = st.toggle(
-        "답변 텍스트 표시",
-        value=st.session_state.get("show_text", False)
-    )
-
-    st.session_state.voice = st.selectbox(
-        "AI 목소리",
-        ["alloy", "nova", "echo", "shimmer", "onyx", "fable"],
-        index=["alloy", "nova", "echo", "shimmer", "onyx", "fable"].index(
-            st.session_state.get("voice", "nova")
-        )
-    )
-
-    st.divider()
-
-    if get_client():
-        st.success("OpenAI API 키 설정됨")
-    else:
-        st.warning("OpenAI API 키 미설정")
-
-    st.caption("JARVIS v1.0 | Streamlit")
-
-
-# ==========================================
-# 6. 음성 비서
-# ==========================================
-if menu == "🎙️ 음성 비서":
-
-    st.markdown("""
-    <div class="hero">
-        <div class="hero-icon">🤖</div>
-        <div class="hero-title">
-            안녕하세요, JARVIS입니다.
+with top_right:
+    st.markdown(
+        """
+        <div style="text-align:right; color:#777; font-size:14px; margin-top:10px;">
+        음성으로 모든 기능 제어
         </div>
-        <div class="hero-subtitle">
-            무엇을 도와드릴까요?<br>
-            마이크로 질문하거나 직접 입력하세요.
+        """,
+        unsafe_allow_html=True
+    )
+
+tab1, tab2 = st.tabs(["Speak", "Listen"])
+
+# -----------------------------------
+# Speak 탭
+# -----------------------------------
+with tab1:
+    st.markdown(
+        """
+        <div class="center-guide">
+        마이크를 눌러 말씀해 주세요.<br>
+        예: "내일 오후 3시에 회의 일정 등록해줘"
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.divider()
+    display_text = st.session_state.last_transcript if st.session_state.last_transcript else "무엇을 도와드릴까요?"
 
-    left, right = st.columns([2, 1])
+    st.markdown(
+        f'<div class="command-card">{display_text}</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="wave-wrap">
+            <div class="mic-circle">🎙️</div>
+            <div class="wave-line"></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    left, right = st.columns([2.2, 1])
 
     with left:
-        st.subheader("🎤 음성 질문")
+        st.markdown('<div class="small-card">', unsafe_allow_html=True)
+        st.markdown('<div class="small-title">음성 입력</div>', unsafe_allow_html=True)
 
-        audio_value = st.audio_input(
-            "마이크를 눌러 말씀해주세요."
-        )
+        audio_value = st.audio_input("여기를 눌러 음성을 녹음하세요")
 
-        if st.button(
-            "🎙️ 음성 질문 실행",
-            type="primary",
-            use_container_width=True
-        ):
-            if audio_value is None:
+        run_voice = st.button("START RECORDING", use_container_width=True)
+
+        if run_voice:
+            if client is None:
+                st.error("OPENAI_API_KEY가 설정되지 않았습니다.")
+            elif audio_value is None:
                 st.warning("먼저 음성을 녹음해주세요.")
             else:
-                client = get_client()
+                with st.spinner("음성을 인식하고 있습니다..."):
+                    transcript = speech_to_text(audio_value.getvalue())
+                    st.session_state.last_transcript = transcript
 
-                if client is None:
-                    st.error("OpenAI API 키가 필요합니다.")
-                else:
-                    try:
-                        with st.spinner("음성을 인식하고 있습니다..."):
-                            question = speech_to_text(
-                                client,
-                                audio_value.getvalue()
-                            )
+                st.success("음성 인식 완료")
 
-                        process_question(question)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-                    except Exception as e:
-                        st.error(f"음성 인식 오류: {e}")
+        st.markdown('<div class="small-card">', unsafe_allow_html=True)
+        st.markdown('<div class="small-title">텍스트 파일 첨부</div>', unsafe_allow_html=True)
+
+        uploaded_file = st.file_uploader("참고용 TXT 파일 업로드", type=["txt"])
+
+        file_text = ""
+        if uploaded_file is not None:
+            file_text = uploaded_file.read().decode("utf-8", errors="replace")
+            st.markdown(
+                f'<div class="status-box">업로드 완료: {uploaded_file.name}</div>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with right:
-        st.subheader("📎 참고 자료")
-
-        uploaded_file = st.file_uploader(
-            "TXT 파일 업로드",
-            type=["txt"]
+        st.markdown('<div class="small-card">', unsafe_allow_html=True)
+        st.markdown('<div class="small-title">가능한 음성 명령</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="hint-list">
+            - 오늘 일정 알려줘<br>
+            - 내일 오후 2시에 회의 등록해줘<br>
+            - 엔비디아 주가 알려줘<br>
+            - 오늘 AI 뉴스 검색해줘<br>
+            - 이 파일 요약해줘
+            </div>
+            """,
+            unsafe_allow_html=True
         )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        reference_text = ""
+        st.markdown('<div class="small-card">', unsafe_allow_html=True)
+        st.markdown('<div class="small-title">상태</div>', unsafe_allow_html=True)
 
-        if uploaded_file is not None:
-            reference_text = uploaded_file.getvalue().decode(
-                "utf-8-sig",
-                errors="replace"
+        if client:
+            st.markdown(
+                '<div class="status-box">OpenAI 연결 준비 완료</div>',
+                unsafe_allow_html=True
             )
-            st.success("참고 문서 준비 완료")
+        else:
+            st.markdown(
+                '<div class="status-box">OpenAI API 키가 필요합니다</div>',
+                unsafe_allow_html=True
+            )
 
-    st.divider()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.subheader("💬 텍스트 질문")
+    st.markdown("### AI 실행")
 
-    question = st.chat_input(
-        "JARVIS에게 질문을 입력하세요..."
+    command_text = st.text_input(
+        "인식된 문장을 수정하거나 직접 입력할 수 있습니다",
+        value=st.session_state.last_transcript
     )
 
-    if question:
-        process_question(question, reference_text)
+    if st.button("SUBMIT", use_container_width=True):
+        if client is None:
+            st.error("OPENAI_API_KEY가 설정되지 않았습니다.")
+        elif not command_text.strip():
+            st.warning("명령을 입력하거나 음성을 인식해주세요.")
+        else:
+            with st.spinner("ThumpsUp AI가 처리 중입니다..."):
+                answer = ask_ai(command_text, file_text)
+                st.session_state.last_answer = answer
+                st.session_state.messages.append({"role": "user", "content": command_text})
+                st.session_state.messages.append({"role": "assistant", "content": answer})
 
-    st.divider()
+# -----------------------------------
+# Listen 탭
+# -----------------------------------
+with tab2:
+    st.markdown(
+        '<div class="small-card"><div class="small-title">AI 응답</div></div>',
+        unsafe_allow_html=True
+    )
 
-    st.subheader("🔊 대화 기록")
+    if st.session_state.last_answer:
+        st.markdown(
+            f'<div class="command-card" style="font-size:28px;">{st.session_state.last_answer}</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("아직 AI 응답이 없습니다.")
+
+    st.markdown("### 최근 대화")
 
     if not st.session_state.messages:
-        st.info("아직 대화 기록이 없습니다.")
+        st.write("대화 기록이 없습니다.")
+    else:
+        for msg in st.session_state.messages[-8:]:
+            role = "사용자" if msg["role"] == "user" else "ThumpsUp AI"
+            st.markdown(f"**{role}**")
+            st.write(msg["content"])
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-
-            if msg["role"] == "user":
-                st.write(msg["content"])
-
-            else:
-                # 음성 우선 출력
-                if msg.get("audio"):
-                    st.audio(
-                        msg["audio"],
-                        format="audio/mp3",
-                        autoplay=False
-                    )
-
-                # 텍스트는 옵션으로 표시
-                if (
-                    st.session_state.show_text
-                    or not msg.get("audio")
-                ):
-                    st.write(msg["content"])
-
-    if st.session_state.messages:
-        if st.button("🗑️ 대화 초기화"):
+        if st.button("대화 초기화", use_container_width=True):
             st.session_state.messages = []
+            st.session_state.last_transcript = ""
+            st.session_state.last_answer = ""
             st.rerun()
 
-
-# ==========================================
-# 7. 일정 관리
-# ==========================================
-elif menu == "📅 일정 관리":
-
-    st.title("📅 일정 관리")
-    st.caption(
-        "음성 일정 관리 기능을 위한 화면"
-    )
-
-    st.info(
-        "현재는 화면 내 임시 일정 저장만 가능합니다. "
-        "Google Calendar에는 등록되지 않습니다."
-    )
-
-    left, right = st.columns([1, 1])
-
-    with left:
-        st.subheader("➕ 일정 추가")
-
-        with st.form("schedule_form"):
-            schedule_title = st.text_input(
-                "일정 제목",
-                placeholder="예: 프로젝트 회의"
-            )
-
-            schedule_date = st.date_input(
-                "날짜",
-                value=date.today()
-            )
-
-            schedule_time = st.time_input(
-                "시간",
-                value=time(10, 0)
-            )
-
-            description = st.text_area(
-                "상세 내용"
-            )
-
-            submitted = st.form_submit_button(
-                "일정 추가",
-                use_container_width=True
-            )
-
-        if submitted:
-            if not schedule_title.strip():
-                st.warning("일정 제목을 입력해주세요.")
-            else:
-                st.session_state.schedules.append({
-                    "title": schedule_title,
-                    "date": schedule_date,
-                    "time": schedule_time,
-                    "description": description
-                })
-
-                st.success("임시 일정이 추가되었습니다.")
-
-    with right:
-        st.subheader("📋 나의 일정")
-
-        selected_date = st.date_input(
-            "조회할 날짜",
-            value=date.today(),
-            key="lookup_date"
-        )
-
-        day_schedules = [
-            item
-            for item in st.session_state.schedules
-            if item["date"] == selected_date
-        ]
-
-        day_schedules.sort(key=lambda x: x["time"])
-
-        if not day_schedules:
-            st.info("선택한 날짜에 등록된 임시 일정이 없습니다.")
-
-        for item in day_schedules:
-            with st.container(border=True):
-                st.markdown(f"**{item['title']}**")
-                st.write(
-                    item["time"].strftime("%H:%M")
-                )
-                if item["description"]:
-                    st.caption(item["description"])
-
-    st.divider()
-    st.subheader("🎙️ 음성 일정 등록")
-    st.caption(
-        "향후 '내일 오후 3시에 회의 등록해줘'와 같은 "
-        "자연어 일정 등록 기능을 연결할 영역입니다."
-    )
-
-
-# ==========================================
-# 8. AI 검색
-# ==========================================
-elif menu == "🔎 AI 검색":
-
-    st.title("🔎 AI 웹 검색")
-    st.caption("최신 정보를 검색하는 AI 비서")
-
-    st.markdown("""
-    <div class="feature-box">
-        <h3>🌐 무엇이 궁금하신가요?</h3>
-        인터넷의 최신 정보를 검색하고
-        음성으로 설명하는 기능을 연결할 예정입니다.
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.form("search_form"):
-        search_query = st.text_input(
-            "검색할 내용",
-            placeholder="예: 오늘 AI 관련 주요 뉴스"
-        )
-
-        search_submit = st.form_submit_button(
-            "🔍 검색",
-            use_container_width=True
-        )
-
-    if search_submit:
-        if search_query.strip():
-            st.session_state.last_search = search_query
-        else:
-            st.warning("검색어를 입력해주세요.")
-
-    if st.session_state.last_search:
-        st.subheader("검색 요청")
-        st.write(st.session_state.last_search)
-
-        st.info(
-            "아직 웹 검색 API가 연결되지 않았습니다. "
-            "현재는 검색 요청 화면만 구현되어 있습니다."
-        )
-
-    st.subheader("추천 검색 주제")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.info("📰 주요 뉴스")
-
-    with col2:
-        st.info("🌤️ 날씨 정보")
-
-    with col3:
-        st.info("💻 최신 IT 기술")
-
-
-# ==========================================
-# 9. 주식 분석
-# ==========================================
-elif menu == "📈 주식 분석":
-
-    st.title("📈 AI 주식 분석")
-    st.caption(
-        "국내 및 해외 주식 종목 검색과 분석"
-    )
-
-    with st.form("stock_form"):
-        stock_name = st.text_input(
-            "종목명 또는 종목 코드",
-            placeholder="삼성전자 / AAPL / NVIDIA"
-        )
-
-        submitted = st.form_submit_button(
-            "📊 종목 조회",
-            use_container_width=True
-        )
-
-    if submitted:
-        if stock_name.strip():
-            st.session_state.last_stock = stock_name
-        else:
-            st.warning("종목명을 입력해주세요.")
-
-    if st.session_state.last_stock:
-        st.subheader(
-            f"📌 {st.session_state.last_stock}"
-        )
-
-        st.info(
-            "종목 코드 자동 식별 및 실시간 시세 API는 "
-            "아직 연결되지 않았습니다."
-        )
-
-    st.divider()
-
-    st.subheader("시장 정보")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("현재 주가", "연동 전")
-
-    with col2:
-        st.metric("전일 대비", "연동 전")
-
-    with col3:
-        st.metric("거래량", "연동 전")
-
-    st.subheader("📉 주가 차트")
-    st.info("실제 주가 데이터를 연결하면 차트가 표시됩니다.")
-
-    st.subheader("🤖 AI 종목 분석")
-    st.caption(
-        "향후 종목 코드 식별, 시세 조회, "
-        "뉴스 분석 및 음성 브리핑을 연결할 영역입니다."
-    )
-
-
-# ==========================================
-# 10. 설정
-# ==========================================
-elif menu == "⚙️ 설정":
-
-    st.title("⚙️ AI 비서 설정")
-
-    st.subheader("🎙️ 음성 설정")
-    st.write(
-        "음성 답변 활성화 여부와 AI 목소리는 "
-        "왼쪽 사이드바에서 변경할 수 있습니다."
-    )
-
-    st.divider()
-
-    st.subheader("🤖 AI 모델")
-
-    st.text_input(
-        "대화 모델",
-        value="gpt-4o-mini",
-        disabled=True
-    )
-
-    st.text_input(
-        "음성 인식 모델",
-        value="whisper-1",
-        disabled=True
-    )
-
-    st.text_input(
-        "음성 합성 모델",
-        value="tts-1",
-        disabled=True
-    )
-
-    st.divider()
-
-    st.subheader("🔐 연결 상태")
-
-    if get_client():
-        st.success("OpenAI API 키 설정됨")
-    else:
-        st.error("OpenAI API 키가 없습니다.")
-
-    st.warning(
-        "Google Calendar, 실시간 웹 검색 및 "
-        "주식 시세 서비스는 미연결 상태입니다."
-    )
+st.markdown('</div>', unsafe_allow_html=True)
