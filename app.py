@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Thumbs Up AI",
     page_icon="👍🏻",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -25,10 +25,8 @@ st.set_page_config(
 # ==========================================
 st.markdown("""
 <style>
-
-/* 페이지 */
 .block-container {
-    max-width: 1180px;
+    max-width: 1150px;
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
@@ -37,110 +35,95 @@ st.markdown("""
     display: none;
 }
 
-/* 전체 메인 카드 */
 .st-key-assistant_card {
-    background: #ffffff !important;
-    border: 1px solid #e5e5e7 !important;
-    border-radius: 28px !important;
-    padding: 28px 34px 35px !important;
+    background: #fff;
+    border: 1px solid #e6e6e9 !important;
+    border-radius: 26px !important;
+    padding: 26px 32px 30px !important;
 }
 
-/* 상단 로고 */
 .brand-title {
     font-size: 24px;
     font-weight: 750;
-    color: #202020;
+    color: #222;
 }
 
-/* 설정 버튼 */
 .st-key-settings_area button {
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
-    font-size: 25px !important;
+    font-size: 24px;
 }
 
-/* 마이크 컨테이너 */
-.st-key-microphone_shell {
-    width: 112px !important;
-    height: 112px !important;
-    margin: 0 auto !important;
-    background: #f4f7ff !important;
-    border: 1px solid #dce5ff !important;
-    border-radius: 50% !important;
-    box-shadow: 0 6px 25px rgba(150,170,255,0.18);
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 10px !important;
-}
-
-/* 웨이브 */
-.wave-left {
-    width: 100%;
-    height: 10px;
-    margin-top: 50px;
+.wave-left, .wave-right {
+    height: 8px;
     border-radius: 100%;
+    filter: blur(2px);
+    opacity: .85;
+}
+
+.wave-left {
     background: linear-gradient(
         90deg,
         transparent,
-        #d3dfff,
-        #b9c8ff,
-        #f2bfd4
+        #c8d7ff,
+        #f0bcd6
     );
-    filter: blur(2px);
 }
 
 .wave-right {
-    width: 100%;
-    height: 10px;
-    margin-top: 50px;
-    border-radius: 100%;
     background: linear-gradient(
         90deg,
-        #f2bfd4,
-        #b9c8ff,
-        #d3dfff,
+        #f0bcd6,
+        #c8d7ff,
         transparent
     );
-    filter: blur(2px);
 }
 
-/* 중앙 문구 */
+.st-key-microphone_shell {
+    width: 94px;
+    height: 94px;
+    margin: 0 auto;
+    border: 1px solid #e0e8ff !important;
+    border-radius: 50% !important;
+    background: #f5f8ff;
+    box-shadow: 0 5px 22px #ccd8ff70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .center-heading {
-    font-size: 26px;
-    font-weight: 750;
     text-align: center;
-    color: #202020;
-    margin-top: 24px;
+    font-size: 25px;
+    font-weight: 750;
+    margin-top: 20px;
 }
 
 .center-subtitle {
-    font-size: 16px;
     text-align: center;
-    color: #888888;
+    color: #888;
+    font-size: 16px;
     margin-top: 10px;
 }
 
 .mic-hint {
-    font-size: 13px;
     text-align: center;
-    color: #aaa;
-    margin-top: 10px;
+    color: #999;
+    font-size: 13px;
+    margin-top: 7px;
 }
 
-/* AI 답변 */
 .answer-title {
     font-size: 20px;
     font-weight: 650;
-    color: #252525;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .answer-text {
     font-size: 17px;
+    color: #62656e;
     line-height: 1.7;
-    color: #686868;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
@@ -152,20 +135,18 @@ st.markdown("""
     overflow: hidden;
 }
 
-/* 더보기 버튼 */
 .st-key-answer_more button {
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: #687389 !important;
+    color: #697589;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 3. 세션 상태 초기화
+# 3. 세션 상태
 # ==========================================
 DEFAULTS = {
     "answer": "",
@@ -174,18 +155,18 @@ DEFAULTS = {
     "expanded": False,
     "history": [],
     "last_audio_hash": None,
+    "audio_version": 0,
 }
 
-for key, value in DEFAULTS.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+for name, default in DEFAULTS.items():
+    if name not in st.session_state:
+        st.session_state[name] = default
 
 
 # ==========================================
 # 4. OpenAI 클라이언트
 # ==========================================
 def get_client():
-
     api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
@@ -201,21 +182,17 @@ def get_client():
 
 
 # ==========================================
-# 5. 시스템 프롬프트
+# 5. AI 시스템 프롬프트
 # ==========================================
 SYSTEM_PROMPT = """
-당신은 Thumbs Up AI라는 한국어 개인 음성 비서입니다.
+당신은 Thumbs Up AI라는 한국어 음성 개인 비서입니다.
 
-역할:
-1. 사용자의 음성 질문을 이해합니다.
-2. 자연스럽고 친절한 한국어로 답변합니다.
-3. 음성으로 듣기 편하도록 간결하게 답변합니다.
-4. 첨부된 텍스트 파일을 참고할 수 있습니다.
-5. 불확실한 정보는 추측하지 않습니다.
-6. 실제로 수행하지 않은 작업을 완료했다고 말하지 않습니다.
+간결하고 자연스럽게 한국어로 말하듯 답하세요.
+첨부된 문서가 있으면 참고하세요.
 
-현재 Google Calendar, 실시간 웹 검색,
-주식 조회 API는 아직 연결되지 않았습니다.
+Google Calendar, 실시간 웹 검색, 주식 시세 조회는
+아직 연결되지 않았으므로 실제로 조회하거나
+실행하지 않은 작업을 완료했다고 말하지 마세요.
 """
 
 
@@ -227,14 +204,14 @@ def process_audio(audio_bytes, reference_text=""):
     client = get_client()
 
     if client is None:
-        st.error("OpenAI API 키가 설정되지 않았습니다.")
-        return
+        st.error(
+            "OPENAI_API_KEY가 설정되지 않았습니다. "
+            "Streamlit Cloud Secrets를 확인하세요."
+        )
+        return False
 
     try:
-
-        # ----------------------------------
         # STT: 음성 -> 텍스트
-        # ----------------------------------
         with st.spinner("음성을 인식하고 있습니다..."):
 
             audio_file = io.BytesIO(audio_bytes)
@@ -248,60 +225,53 @@ def process_audio(audio_bytes, reference_text=""):
             question = transcript.text.strip()
 
         if not question:
-            st.warning("음성을 인식하지 못했습니다.")
-            return
+            st.warning(
+                "음성이 인식되지 않았습니다. 다시 녹음해 주세요."
+            )
+            return False
 
-        # ----------------------------------
-        # AI 입력 메시지
-        # ----------------------------------
-        messages = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT
-            }
-        ]
+        # AI 입력 메시지 구성
+        system_text = SYSTEM_PROMPT
 
         if reference_text:
-            messages.append({
-                "role": "system",
-                "content": (
-                    "참고 파일 내용:\n"
-                    + reference_text[:15000]
-                )
-            })
+            system_text += (
+                "\n\n첨부 문서 내용:\n"
+                + reference_text[:15000]
+            )
 
-        # 이전 대화 기록
-        messages.extend(
-            st.session_state.history[-8:]
-        )
+        messages = [
+            {"role": "system", "content": system_text}
+        ]
+
+        messages.extend(st.session_state.history[-8:])
 
         messages.append({
             "role": "user",
             "content": question
         })
 
-        # ----------------------------------
-        # GPT 답변 생성
-        # ----------------------------------
-        with st.spinner("Thumbs Up AI가 답변 중입니다..."):
+        # GPT 응답
+        with st.spinner(
+            "Thumbs Up AI가 답변을 생성하고 있습니다..."
+        ):
 
             response = client.responses.create(
                 model="gpt-4o-mini",
                 input=messages
             )
 
-            answer = response.output_text.strip()
+            answer = (
+                response.output_text.strip()
+                or "답변을 생성하지 못했습니다."
+            )
 
-        if not answer:
-            answer = "답변을 생성하지 못했습니다."
-
-        # ----------------------------------
         # TTS: 텍스트 -> 음성
-        # ----------------------------------
-        answer_audio = None
+        spoken_audio = None
 
         try:
-            with st.spinner("음성 답변을 생성하고 있습니다..."):
+            with st.spinner(
+                "음성 답변을 준비하고 있습니다..."
+            ):
 
                 speech = client.audio.speech.create(
                     model="tts-1",
@@ -309,47 +279,44 @@ def process_audio(audio_bytes, reference_text=""):
                     input=answer[:4000]
                 )
 
-                answer_audio = speech.read()
+                spoken_audio = speech.read()
 
-        except Exception as e:
-            st.warning(f"음성 합성 오류: {e}")
+        except Exception as exc:
+            st.warning(f"음성 합성 오류: {exc}")
 
-        # ----------------------------------
         # 상태 저장
-        # ----------------------------------
         st.session_state.transcript = question
         st.session_state.answer = answer
-        st.session_state.audio_answer = answer_audio
+        st.session_state.audio_answer = spoken_audio
         st.session_state.expanded = False
+        st.session_state.audio_version += 1
 
         st.session_state.history.extend([
-            {
-                "role": "user",
-                "content": question
-            },
-            {
-                "role": "assistant",
-                "content": answer
-            }
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer}
         ])
 
-    except Exception as e:
-        st.error(f"음성 처리 중 오류: {e}")
+        return True
+
+    except Exception as exc:
+        st.error(f"음성 처리 중 오류: {exc}")
+        return False
 
 
 # ==========================================
-# 7. TXT 파일 가져오기
+# 7. 참고 파일 읽기
 # ==========================================
 reference_text = ""
 
 current_file = st.session_state.get("txt_file")
 
 if current_file is not None:
-
     reference_text = current_file.getvalue().decode(
         "utf-8-sig",
         errors="replace"
     )
+
+just_processed = False
 
 
 # ==========================================
@@ -357,9 +324,7 @@ if current_file is not None:
 # ==========================================
 with st.container(key="assistant_card"):
 
-    # --------------------------------------
-    # 상단 헤더
-    # --------------------------------------
+    # 상단 로고 / 설정
     logo_col, settings_col = st.columns(
         [15, 1],
         vertical_alignment="center"
@@ -375,13 +340,14 @@ with st.container(key="assistant_card"):
 
     with settings_col:
         with st.container(key="settings_area"):
-
             if st.button(
                 "⚙️",
-                key="settings",
+                key="settings_button",
                 help="설정"
             ):
-                st.toast("설정 기능은 추후 추가 예정입니다.")
+                st.toast(
+                    "설정 창은 추후 연결할 예정입니다."
+                )
 
     st.divider()
 
@@ -392,53 +358,37 @@ with st.container(key="assistant_card"):
     # 9. 웨이브 + 단일 마이크 버튼
     # ======================================
     wave_left, mic_col, wave_right = st.columns(
-        [5, 1.5, 5],
+        [5, 1.6, 5],
         gap="small",
         vertical_alignment="center"
     )
 
     with wave_left:
-
         st.markdown(
             '<div class="wave-left"></div>',
             unsafe_allow_html=True
         )
 
     with mic_col:
-
         with st.container(key="microphone_shell"):
 
-            # 실제 녹음 버튼은 하나만 존재
+            # 하나의 마이크로 녹음 시작/종료
             audio_bytes = audio_recorder(
                 text="",
                 icon_name="microphone",
                 icon_size="3x",
-
-                # 녹음 대기: 연보라색
                 neutral_color="#9b91b5",
-
-                # 녹음 중: 분홍색
                 recording_color="#ec789b",
-
-                # 버튼을 직접 눌러 녹음 종료
-                # 자동 침묵 종료는 사용하지 않음
-                energy_threshold=(-1.0, 1.0),
-                pause_threshold=3600,
-
-                auto_start=False,
                 key="single_mic"
             )
 
     with wave_right:
-
         st.markdown(
             '<div class="wave-right"></div>',
             unsafe_allow_html=True
         )
 
-    # ======================================
-    # 10. 중앙 안내 문구
-    # ======================================
+    # 중앙 안내 문구
     st.markdown("""
     <div class="center-heading">
         무엇을 도와드릴까요?
@@ -449,7 +399,7 @@ with st.container(key="assistant_card"):
     </div>
 
     <div class="mic-hint">
-        다시 누르면 녹음이 종료됩니다.
+        같은 버튼을 다시 누르면 녹음이 종료됩니다.
     </div>
     """, unsafe_allow_html=True)
 
@@ -457,7 +407,7 @@ with st.container(key="assistant_card"):
     st.write("")
 
     # ======================================
-    # 11. 녹음 종료 후 자동 실행
+    # 10. 녹음 완료 시 자동 실행
     # ======================================
     if audio_bytes:
 
@@ -465,18 +415,17 @@ with st.container(key="assistant_card"):
             audio_bytes
         ).hexdigest()
 
-        # 동일한 음성 중복 처리 방지
         if audio_hash != st.session_state.last_audio_hash:
 
             st.session_state.last_audio_hash = audio_hash
 
-            process_audio(
+            just_processed = process_audio(
                 audio_bytes,
                 reference_text
             )
 
     # ======================================
-    # 12. AI 답변 표시
+    # 11. AI 답변 출력
     # ======================================
     st.markdown(
         '<div class="answer-title">AI 답변</div>',
@@ -487,109 +436,100 @@ with st.container(key="assistant_card"):
 
     if answer:
 
-        safe_answer = html.escape(answer)
-
         if st.session_state.expanded:
             css_class = "answer-text"
         else:
             css_class = "answer-text clamped"
 
+        safe_answer = html.escape(answer)
+
         st.markdown(
-            f"""
-            <div class="{css_class}">{safe_answer}</div>
-            """,
+            f'<div class="{css_class}">'
+            f'{safe_answer}'
+            f'</div>',
             unsafe_allow_html=True
         )
 
-        # 긴 답변은 더보기
+        # 긴 답변의 더보기 버튼
         is_long = (
             len(answer) > 85
             or answer.count("\n") >= 2
         )
 
         if is_long:
-
             with st.container(key="answer_more"):
 
-                button_text = (
-                    "접기 ▲"
-                    if st.session_state.expanded
-                    else "더보기 ▼"
-                )
+                if st.session_state.expanded:
+                    label = "접기 ▲"
+                else:
+                    label = "더보기 ▼"
 
                 if st.button(
-                    button_text,
+                    label,
                     key="toggle_more"
                 ):
                     st.session_state.expanded = (
                         not st.session_state.expanded
                     )
-
                     st.rerun()
 
-        # AI 음성 답변
+        # TTS 음성 재생
         if st.session_state.audio_answer:
-
             st.audio(
                 st.session_state.audio_answer,
                 format="audio/mp3",
-                autoplay=True
+                autoplay=just_processed
             )
 
     else:
-
         st.markdown(
-            """
-            <div class="answer-text">
-                음성 명령에 대한 답변이 표시됩니다.
-            </div>
-            """,
+            '<div class="answer-text">'
+            '음성 명령에 대한 답변이 표시됩니다.'
+            '</div>',
             unsafe_allow_html=True
         )
 
 
 # ==========================================
-# 13. 인식된 음성 확인
+# 12. 음성 인식 결과 확인
 # ==========================================
 if st.session_state.transcript:
 
     with st.expander("인식된 음성 확인"):
-
-        st.write(
-            st.session_state.transcript
-        )
+        st.write(st.session_state.transcript)
 
 
 # ==========================================
-# 14. 대화 기록
+# 13. 최근 대화 기록
 # ==========================================
 with st.expander("최근 대화 기록"):
 
     if not st.session_state.history:
-
         st.caption("아직 대화 기록이 없습니다.")
 
     else:
-
         for message in st.session_state.history[-10:]:
 
             if message["role"] == "user":
-                st.markdown("**나**")
+                who = "나"
             else:
-                st.markdown("**Thumbs Up AI**")
+                who = "Thumbs Up AI"
 
+            st.markdown(f"**{who}**")
             st.write(message["content"])
 
-        if st.button("대화 초기화"):
-
-            for key, value in DEFAULTS.items():
-                st.session_state[key] = value
+        if st.button(
+            "대화 초기화",
+            key="clear_history"
+        ):
+            for name, default in DEFAULTS.items():
+                st.session_state[name] = default
 
             st.rerun()
 
 
 # ==========================================
-# 15. 파일 업로드
+# 14. TXT 파일 업로드
 # ==========================================
 with st.expander("📎 참고 TXT 파일 첨부 (선택)"):
 
@@ -600,7 +540,6 @@ with st.expander("📎 참고 TXT 파일 첨부 (선택)"):
     )
 
     if uploaded_file is not None:
-
         st.success(
             f"{uploaded_file.name} 파일이 첨부되었습니다."
         )
