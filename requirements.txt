@@ -1,3 +1,2 @@
-streamlit>=1.40,<2
-openai>=2,<4
-streamlit-audiorecorder
+streamlit==1.64.0
+openai==3.16.2
