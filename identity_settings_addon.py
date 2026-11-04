@@ -321,7 +321,7 @@ def render_identity_settings():
             st.write("검토 필요:", last["unresolved"] or "없음")
 
 
-@st.dialog("⚙️ 설정", width="large")
+@st.dialog("⚙️ ", width="large")
 def show_identity_settings_dialog():
     """현재 화면의 오른쪽 위 설정 버튼용 팝업."""
     render_identity_settings()
