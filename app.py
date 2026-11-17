@@ -24,6 +24,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
+from langchain_core.runnables import RunnablePassthrough #(수)
 
 st.set_page_config(page_title="AIVLE School 학습 도우미", page_icon="🎓", layout="wide")
 
@@ -131,9 +132,9 @@ def rag_pipeline(filepath):
     llm = ChatOpenAI(model=LLM_MODEL, temperature=TEMPERATURE)
 
     # RAG 체인 구성 _________________________ #수정
-   from langchain_core.runnables import RunnablePassthrough
+  
 
-  rag_chain = (
+    rag_chain = (
     RunnablePassthrough.assign(
         docs=itemgetter("input") | retriever
     )
