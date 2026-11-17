@@ -421,11 +421,16 @@ with chat_col:
                 st.markdown(question)
 
             with st.chat_message("assistant"):
-                with st.spinner("답변을 찾는 중..."):
-                     result = ask(question)#(수정)
-                    
-                st.markdown(answer)
-                show_sources(result["sources"])
+              with st.spinner("답변을 찾는 중..."):
+                  result = ask(question)
 
-            current["messages"].append({"role": "assistant", "content": answer})
-            st.rerun()   # 히스토리 제목·미리보기를 바로 갱신
+              st.markdown(result["answer"])  # 수정: answer → result["answer"]
+              show_sources(result["sources"])
+
+            current["messages"].append({
+              "role": "assistant",
+              "content": result["answer"],   # 수정: 답변 저장
+              "sources": result["sources"]   # 수정: 근거 문단 저장
+})
+
+            st.rerun()  # 히스토리 제목·미리보기를 바로 갱신
