@@ -130,18 +130,30 @@ def rag_pipeline(filepath):
     # LLM 선언
     llm = ChatOpenAI(model=LLM_MODEL, temperature=TEMPERATURE)
 
-    # RAG 체인 구성
-    rag_chain = (
-        {
-            "context": itemgetter("input") | retriever | format_docs,
-            "input": itemgetter("input"),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+    # RAG 체인 구성 _________________________ #수정
+   from langchain_core.runnables import RunnablePassthrough
 
-    return rag_chain
+  rag_chain = (
+    RunnablePassthrough.assign(
+        docs=itemgetter("input") | retriever
+    )
+    .assign(
+        context=lambda x: format_docs(x["docs"])
+    )
+    .assign(
+        answer=(
+            {
+                "context": itemgetter("context"),
+                "input": itemgetter("input"),
+            }
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+    )
+)
+
+return rag_chain
 
 
 # ════════════════════════════════════════════════════════
@@ -207,11 +219,14 @@ def build_chain(uploaded_file):
         os.remove(tmp_path)
 
 
-def ask(question):
+def ask(question):________________________#수정 
     try:
         return ss.rag_chain.invoke({"input": question})
     except Exception as e:
-        return f"오류가 발생했어요: {e}"
+        return {
+            "answer": f"오류가 발생했어요: {e}",
+            "sources": []
+        }
 
 
 # ── 스타일 ──────────────────────────────────────────────
@@ -378,19 +393,21 @@ with chat_col:
 
     question = user_input or ss.pop("pending_question", None)
 
-    with chat_box:
+    with chat_box:#(수정)
         for idx, msg in enumerate(current["messages"]):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant":
+                    show_sources(msg.get("sources", []))
                     st.feedback("thumbs", key=f"fb_{ss.current_id}_{idx}")
 
         if regenerate:
             last_q = next(m["content"] for m in reversed(current["messages"]) if m["role"] == "user")
             with st.spinner("답변을 다시 만드는 중..."):
-                new_answer = ask(last_q)
+                new_answer = ask(last_q)# 수정
             if current["messages"][-1]["role"] == "assistant":
-                current["messages"][-1]["content"] = new_answer
+                current["messages"][-1]["content"] = new_answer["answer"]
+                current["messages"][-1]["sources"] = new_answer["sources"]
             st.rerun()
 
         if question:
@@ -404,8 +421,10 @@ with chat_col:
 
             with st.chat_message("assistant"):
                 with st.spinner("답변을 찾는 중..."):
-                    answer = ask(question)
+                     result = ask(question)#(수정)
+                    
                 st.markdown(answer)
+                show_sources(result["sources"])
 
             current["messages"].append({"role": "assistant", "content": answer})
             st.rerun()   # 히스토리 제목·미리보기를 바로 갱신
