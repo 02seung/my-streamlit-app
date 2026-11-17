@@ -219,8 +219,7 @@ def build_chain(uploaded_file):
     finally:
         os.remove(tmp_path)
 
-
-def ask(question):________________________#수정 
+def ask(question):
     try:
         return ss.rag_chain.invoke({"input": question})
     except Exception as e:
