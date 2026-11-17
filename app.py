@@ -134,27 +134,28 @@ def rag_pipeline(filepath):
     # RAG 체인 구성 _________________________ #수정
   
 
+        # RAG 체인 구성 
     rag_chain = (
-    RunnablePassthrough.assign(
-        docs=itemgetter("input") | retriever
-    )
-    .assign(
-        context=lambda x: format_docs(x["docs"])
-    )
-    .assign(
-        answer=(
-            {
-                "context": itemgetter("context"),
-                "input": itemgetter("input"),
-            }
-            | prompt
-            | llm
-            | StrOutputParser()
+        RunnablePassthrough.assign(
+            docs=itemgetter("input") | retriever
+        )
+        .assign(
+            context=lambda x: format_docs(x["docs"])
+        )
+        .assign(
+            answer=(
+                {
+                    "context": itemgetter("context"),
+                    "input": itemgetter("input"),
+                }
+                | prompt
+                | llm
+                | StrOutputParser()
+            )
         )
     )
-)
 
-return rag_chain
+    return rag_chain
 
 
 # ════════════════════════════════════════════════════════
