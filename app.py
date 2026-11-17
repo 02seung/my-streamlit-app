@@ -281,16 +281,34 @@ def ask(question):
 
 # 수정: AI 답변 아래 원본 검색 문단을 접이식으로 표시
 # 실제로 검색된 문단이며, AI가 모든 문단을 사용했다는 의미는 아님
-def show_sources(sources):
+def show_sources(sources): # 수정
     if not sources:
         return
-    with st.expander(f"📖 답변 근거 보기 ({len(sources)}개)", expanded=False):
-        st.caption("답변 생성 시 검색되어 AI에 제공된 백서 문단입니다.")
-        for index, source in enumerate(sources, start=1):
-            st.markdown(f"**근거 {index} · {source['page']}**")
-            st.text(source["content"])
-            if index < len(sources):
-                st.divider()
+
+    # 수정: 버튼에는 개수를 표시하지 않고 '더보기'만 표시
+    with st.expander("📖 더보기", expanded=False):
+
+        st.caption("AI 답변 생성 시 참고한 백서 문단입니다.")
+
+        # 수정: 최대 3개를 개별 카드로 표시
+        for i, source in enumerate(sources[:3], start=1):
+
+            with st.container(border=True):
+
+                page = source.get("page", "쪽 번호 없음")
+                content = source.get("content", "").strip()
+
+                # 수정: 문단 번호와 페이지 번호 구분
+                col1, col2 = st.columns([3, 1])
+
+                with col1:
+                    st.markdown(f"**참고 문단 {i}**")
+
+                with col2:
+                    st.caption(page)
+
+                # 수정: 원본 문단 출력
+                st.write(content)
 
 
 # ── 스타일 ──────────────────────────────────────────────
